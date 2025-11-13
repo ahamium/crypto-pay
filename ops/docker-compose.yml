@@ -1,0 +1,20 @@
+services:
+  backend:
+    build: ../backend            # ../backend 폴더의 Dockerfile로 이미지 빌드
+    env_file:
+      - ./ops/.env
+    ports:
+      - "5000:5000"              # 호스트포트:컨테이너포트
+    # volumes:                   # (선택) 개발중 라이브코드 마운트
+    #   - ../backend:/app
+
+  frontend:
+    build: ../frontend
+    env_file:
+      - ./ops/.env
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend                  # backend가 먼저 준비되어야 함
+    # volumes:
+    #   - ../frontend:/app

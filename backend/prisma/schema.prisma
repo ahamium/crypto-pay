@@ -1,0 +1,90 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+datasource db {
+provider = "sqlite"
+url = env("DATABASE_URL")
+}
+
+
+generator client {
+provider = "prisma-client-js"
+}
+
+
+model User {
+id Int @id @default(autoincrement())
+address String @unique
+createdAt DateTime @default(now())
+lastLoginAt DateTime?
+sessions Session[]
+invoices Invoice[]
+}
+
+
+model Session {
+id Int @id @default(autoincrement())
+address String
+nonce String
+used Boolean @default(false)
+createdAt DateTime @default(now())
+usedAt DateTime?
+user User? @relation(fields: [userId], references: [id])
+userId Int?
+
+
+@@index([address])
+@@index([nonce])
+}
+
+model Invoice {
+  id            Int       @id @default(autoincrement())
+  invoiceId     String    @unique                 // 외부에 보여줄 공개 ID
+  status        String    @default("pending")     // pending | paid | expired | failed
+  chainId       Int
+  tokenAddress  String                               // "0x000...0" = 네이티브
+  tokenSymbol   String
+  amount        String
+  toAddress     String                               
+  forUserId     Int?                                 
+  createdAt     DateTime  @default(now())
+  expiresAt     DateTime?
+  txHash        String?   @unique
+  payerAddress  String?
+  metaJson      Json?
+  user          User?     @relation(fields: [forUserId], references: [id])
+  confirmations Int?
+  confirmedAt   DateTime?
+  lastCheckedAt DateTime?
+  verifyRetries Int        @default(0)
+
+  @@index([status, chainId])
+  @@index([status, lastCheckedAt])
+  @@index([status, verifyRetries])
+
+  @@index([status, createdAt])
+  @@index([chainId, createdAt])
+  @@index([createdAt])
+  @@index([payerAddress])
+}
+
+model TokenWhitelist {
+  id           Int     @id @default(autoincrement())
+  chainId      Int
+  tokenAddress String   // "0x000...0" = 네이티브
+  tokenSymbol  String
+  decimals     Int      @default(18)
+  enabled      Boolean  @default(true)
+
+  @@unique([chainId, tokenAddress]) // Composite Unique Index
+}
+
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  createdAt DateTime @default(now())
+  actorId   Int?
+  actorAddr String?
+  action    String
+  target    String?
+  ip        String?
+  meta      Json?
+}
