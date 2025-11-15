@@ -15,7 +15,7 @@ RUN pnpm config set node-linker hoisted
 COPY --from=deps /app/node_modules ./node_modules
 # 소스 코드만 복사 (node_modules 덮어쓰지 않음)
 COPY . .
-RUN pnpm build
+RUN pnpm prisma generate && pnpm build
 
 FROM node:20-alpine AS runner
 WORKDIR /app
