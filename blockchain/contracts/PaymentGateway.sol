@@ -98,8 +98,8 @@ contract PaymentGateway is IPaymentGateway, Ownable, Pausable, ReentrancyGuard {
 
         if (token == address(0)) {
             require(msg.value == amount, "bad value");
-            (bool ok, ) = feeRecipient.call{value: amount}("");
-            require(ok, "native transfer fail");
+            // (bool ok, ) = feeRecipient.call{value: amount}("");
+            // require(ok, "native transfer fail");
         } else {
             IERC20(token).safeTransferFrom(msg.sender, feeRecipient, amount);
         }
