@@ -2,12 +2,13 @@ import { Injectable } from '@nestjs/common';
 import { PrismaClient } from '@prisma/client';
 import { AdminPaymentsQuery } from './dto/admin-payments.query';
 
-type InvoiceFindManyArgs = NonNullable<
-  Parameters<PrismaClient['invoice']['findMany']>[0]
->;
+type InvoiceWhereInput = {
+  [key: string]: any;
+};
 
-type InvoiceWhereInput = InvoiceFindManyArgs['where'];
-type InvoiceOrderByInput = InvoiceFindManyArgs['orderBy'];
+type InvoiceOrderByInput =
+  | { [field: string]: 'asc' | 'desc' | undefined }
+  | Array<{ [field: string]: 'asc' | 'desc' | undefined }>;
 
 @Injectable()
 export class AdminPaymentsService {
