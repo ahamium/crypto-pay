@@ -2,6 +2,7 @@
   "name": "crypto-pay-monorepo",
   "private": true,
   "scripts": {
+    "prebuild": "cd backend && pnpm prisma generate",
     "dev": "pnpm -r --parallel dev",
     "build": "pnpm -r build",
     "lint": "pnpm -r lint",
