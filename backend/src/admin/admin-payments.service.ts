@@ -1,13 +1,20 @@
 import { Injectable } from '@nestjs/common';
-import { Prisma, PrismaClient } from '@prisma/client';
+import { PrismaClient } from '@prisma/client';
 import { AdminPaymentsQuery } from './dto/admin-payments.query';
+
+type InvoiceFindManyArgs = NonNullable<
+  Parameters<PrismaClient['invoice']['findMany']>[0]
+>;
+
+type InvoiceWhereInput = InvoiceFindManyArgs['where'];
+type InvoiceOrderByInput = InvoiceFindManyArgs['orderBy'];
 
 @Injectable()
 export class AdminPaymentsService {
   constructor(private prisma: PrismaClient) {}
 
-  buildWhere(q: AdminPaymentsQuery): Prisma.InvoiceWhereInput {
-    const where: Prisma.InvoiceWhereInput = {};
+  buildWhere(q: AdminPaymentsQuery): InvoiceWhereInput {
+    const where: InvoiceWhereInput = {};
     if (q.status) where.status = q.status;
     if (q.chainId) where.chainId = q.chainId;
     if (q.from || q.to) {
@@ -30,7 +37,7 @@ export class AdminPaymentsService {
   async list(q: AdminPaymentsQuery) {
     const where = this.buildWhere(q);
     const skip = (q.page! - 1) * q.pageSize!;
-    const orderBy: Prisma.InvoiceOrderByWithRelationInput = {
+    const orderBy: InvoiceOrderByInput = {
       [q.sortBy!]: q.sortDir,
     };
 
