@@ -1,0 +1,70 @@
+name: CD
+
+on:
+  push:
+    branches: [main] # main에 push될 때마다 배포
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    permissions:
+      id-token: write
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # 1) Azure 로그인
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+
+      # 2) 이 워크플로우 안에서 쓸 환경 변수들 주입
+      - name: Set vars
+        run: |
+          echo "RG=rg-crypto-pay-dev" >> $GITHUB_ENV          # 네가 만든 리소스 그룹 이름
+          echo "APP_BE=app-crypto-pay-be" >> $GITHUB_ENV      # 백엔드 Web App 이름
+          echo "APP_FE=app-crypto-pay-fe" >> $GITHUB_ENV      # 프론트 Web App 이름
+          echo "REG=ghcr.io" >> $GITHUB_ENV
+          echo "IMG_BE=${{ github.repository }}-backend" >> $GITHUB_ENV
+          echo "IMG_FE=${{ github.repository }}-frontend" >> $GITHUB_ENV
+          echo "TAG=sha-${{ github.sha }}" >> $GITHUB_ENV     # CI에서 푸시한 태그와 동일
+
+      # (옵션) GHCR가 Private이면 로그인 필요 (지금은 굳이 안 써도 됨)
+      # - name: Docker login GHCR
+      #   uses: docker/login-action@v3
+      #   with:
+      #     registry: ghcr.io
+      #     username: ${{ github.actor }}
+      #     password: ${{ secrets.GITHUB_TOKEN }}
+
+      # 3) 백엔드 Web App가 사용할 컨테이너 이미지 교체
+      - name: Update backend container
+        run: |
+          az webapp config container set \
+            --resource-group $RG \
+            --name $APP_BE \
+            --container-image-name "$REG/${IMG_BE}:$TAG" \
+            --container-registry-url "https://$REG"
+          az webapp restart --resource-group $RG --name $APP_BE
+
+      # 4) 프론트 Web App도 동일하게 교체
+      - name: Update frontend container
+        run: |
+          az webapp config container set \
+            --resource-group $RG \
+            --name $APP_FE \
+            --container-image-name "$REG/${IMG_FE}:$TAG" \
+            --container-registry-url "https://$REG"
+          az webapp restart --resource-group $RG --name $APP_FE
+
+      # 5) 간단 헬스 체크 (선택)
+      - name: Smoke check
+        run: |
+          sleep 10
+          curl -f https://${{ env.APP_BE }}.azurewebsites.net/health || exit 1
+          curl -f https://${{ env.APP_FE }}.azurewebsites.net || exit 1
