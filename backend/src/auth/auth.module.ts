@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
 import { PrismaService } from '../prisma.service';
 import { JwtStrategy } from './jwt.strategy';
+import { SecurityModule } from 'src/security/security.module';
 
 @Module({
   imports: [
@@ -12,6 +13,7 @@ import { JwtStrategy } from './jwt.strategy';
       secret: process.env.JWT_SECRET || 'dev-secret',
       signOptions: { expiresIn: '7d' },
     }),
+    SecurityModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, PrismaService, JwtStrategy],

@@ -8,7 +8,6 @@ import { AuthModule } from './auth/auth.module';
 import { PaymentsModule } from './payments/payments.module';
 import { VerifierModule } from './tx-verifier/verifier.module';
 import { AdminModule } from './admin/admin.module';
-import { KeyVaultService } from './security/keyvault.service';
 
 @Module({
   imports: [
@@ -23,6 +22,6 @@ import { KeyVaultService } from './security/keyvault.service';
     AdminModule,
   ],
   controllers: [AppController, HealthController],
-  providers: [PrismaService, AppService, KeyVaultService],
+  providers: [PrismaService, AppService],
 })
 export class AppModule {}

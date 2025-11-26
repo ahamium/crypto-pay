@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
-import { PrismaClient } from '@prisma/client';
 import { AdminPaymentsQuery } from './dto/admin-payments.query';
+import { PrismaService } from 'src/prisma.service';
 
 type InvoiceWhereInput = {
   [key: string]: any;
@@ -12,7 +12,7 @@ type InvoiceOrderByInput =
 
 @Injectable()
 export class AdminPaymentsService {
-  constructor(private prisma: PrismaClient) {}
+  constructor(private prisma: PrismaService) {}
 
   buildWhere(q: AdminPaymentsQuery): InvoiceWhereInput {
     const where: InvoiceWhereInput = {};
