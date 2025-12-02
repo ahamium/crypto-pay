@@ -64,7 +64,35 @@ jobs:
 
       # 5) 간단 헬스 체크 (선택)
       - name: Smoke check
+        env:
+          BE_URL: https://${{ env.APP_BE }}.azurewebsites.net/health
+          FE_URL: https://${{ env.APP_FE }}.azurewebsites.net
         run: |
-          sleep 10
-          curl -f https://${{ env.APP_BE }}.azurewebsites.net/health || exit 1
-          curl -f https://${{ env.APP_FE }}.azurewebsites.net || exit 1
+          set -e
+
+          check() {
+            local name=$1
+            local url=$2
+
+            echo "=== Checking $name at $url ==="
+
+            # 최대 10번, 10초 간격으로 재시도 (총 100초)
+            for i in {1..10}; do
+              if curl -fsS "$url" > /dev/null; then
+                echo "$name OK on attempt $i"
+                return 0
+              fi
+
+              echo "$name not ready yet (attempt $i), waiting 10s..."
+              sleep 10
+            done
+
+            echo "$name FAILED healthcheck after 10 attempts"
+            return 1
+          }
+
+          # 백엔드 /health 확인
+          check "backend" "$BE_URL"
+
+          # 프론트 루트 페이지 확인
+          check "frontend" "$FE_URL"
