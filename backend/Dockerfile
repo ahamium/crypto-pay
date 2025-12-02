@@ -41,9 +41,16 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/prisma ./prisma
 COPY package.json ./
 
-# 필요하면 여기서도 권한 정리 (선택)
-RUN chown -R app:app /app
+# SQLite가 들어갈 디렉터리 생성 (쓰기 가능)
+RUN mkdir -p /home/data
+
+# entrypoint.sh 복사 + 실행권한
+COPY entrypoint.sh ./entrypoint.sh
+RUN chmod +x ./entrypoint.sh
+
+# 권한 정리: app 유저가 /app, /home/data 쓸 수 있게
+RUN chown -R app:app /app /home/data
 USER app
 
 EXPOSE 5000
-CMD ["node", "dist/src/main.js"]
+CMD ["./entrypoint.sh"]
