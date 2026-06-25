@@ -8,8 +8,26 @@ import { walletConnect } from '@wagmi/connectors';
 
 const queryClient = new QueryClient();
 
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID; // optional
-const connectors = [injected(), ...(projectId ? [walletConnect({ projectId })] : [])];
+const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
+const connectors = [
+  injected({
+    target: 'metaMask',
+  }),
+  ...(projectId
+    ? [
+        walletConnect({
+          projectId,
+          metadata: {
+            name: 'Crypto Pay Gateway',
+            description: 'Crypto payment gateway demo',
+            url: 'https://app-crypto-pay-fe.azurewebsites.net',
+            icons: ['https://app-crypto-pay-fe.azurewebsites.net/favicon.ico'],
+          },
+          showQrModal: true,
+        }),
+      ]
+    : []),
+];
 
 const config = createConfig({
   chains: [sepolia],

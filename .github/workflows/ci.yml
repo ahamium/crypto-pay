@@ -98,6 +98,9 @@ jobs:
         run: |
           docker build \
             -f frontend/Dockerfile \
+            --build-arg NEXT_PUBLIC_API_BASE_URL=https://app-crypto-pay-be.azurewebsites.net \
+            --build-arg NEXT_PUBLIC_NETWORK=sepolia \
+            --build-arg NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID="${{ secrets.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID }}" \
             -t $REGISTRY/${IMAGE_FRONTEND}:sha-${{ github.sha }} \
             frontend
 
