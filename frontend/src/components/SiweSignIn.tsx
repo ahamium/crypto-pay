@@ -3,6 +3,7 @@
 import { useAccount, useConnect, useDisconnect, useSignMessage } from 'wagmi';
 import { SiweMessage } from 'siwe';
 import { useMemo, useState } from 'react';
+import Link from 'next/link';
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 const EXPECTED_CHAIN_ID = 11155111; // Sepolia
@@ -15,8 +16,6 @@ function shortAddress(address?: string) {
 function getMetaMaskMobileDeepLink() {
   if (typeof window === 'undefined') return '#';
 
-  // MetaMask mobile deep link format:
-  // https://link.metamask.io/dapp/{domain/path}
   const urlWithoutProtocol = window.location.href.replace(/^https?:\/\//, '');
   return `https://link.metamask.io/dapp/${urlWithoutProtocol}`;
 }
@@ -55,7 +54,6 @@ export default function SiweSignIn() {
     setMessage(null);
 
     try {
-      // 1) 서버에서 nonce 발급
       const nonceRes = await fetch(`${API}/auth/nonce?address=${address}`);
 
       if (!nonceRes.ok) {
@@ -64,7 +62,6 @@ export default function SiweSignIn() {
 
       const { nonce } = (await nonceRes.json()) as { nonce: string };
 
-      // 2) SIWE 메시지 구성
       const siwe = new SiweMessage({
         domain: window.location.host,
         address,
@@ -77,10 +74,8 @@ export default function SiweSignIn() {
 
       const preparedMessage = siwe.prepareMessage();
 
-      // 3) 지갑으로 서명
       const signature = await signMessageAsync({ message: preparedMessage });
 
-      // 4) 서버 검증 → JWT
       const verifyRes = await fetch(`${API}/auth/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -119,7 +114,7 @@ export default function SiweSignIn() {
       style={{
         display: 'grid',
         gap: 16,
-        maxWidth: 520,
+        maxWidth: 560,
         border: '1px solid #ddd',
         borderRadius: 12,
         padding: 20,
@@ -220,6 +215,54 @@ export default function SiweSignIn() {
           </button>
 
           <button onClick={handleDisconnect}>Disconnect</button>
+
+          {jwt && (
+            <div
+              style={{
+                display: 'grid',
+                gap: 8,
+                marginTop: 12,
+                padding: 12,
+                border: '1px solid #d9f7be',
+                background: '#f6ffed',
+                borderRadius: 8,
+              }}
+            >
+              <strong>Login complete. Choose your next step:</strong>
+
+              <Link
+                href="/pay"
+                style={{
+                  display: 'block',
+                  padding: '10px 14px',
+                  border: '1px solid #ccc',
+                  borderRadius: 6,
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  color: 'black',
+                  background: 'white',
+                }}
+              >
+                Go to Payment Page
+              </Link>
+
+              <Link
+                href="/admin"
+                style={{
+                  display: 'block',
+                  padding: '10px 14px',
+                  border: '1px solid #ccc',
+                  borderRadius: 6,
+                  textAlign: 'center',
+                  textDecoration: 'none',
+                  color: 'black',
+                  background: 'white',
+                }}
+              >
+                Go to Admin Dashboard
+              </Link>
+            </div>
+          )}
         </div>
       )}
 
