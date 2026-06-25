@@ -1,7 +1,5 @@
 import {
   getAccount,
-  //getPublicClient,
-  getWalletClient,
   switchChain,
   writeContract,
   waitForTransactionReceipt,
@@ -13,6 +11,7 @@ import gatewayAbi from '@/contracts/PaymentGateway.abi.json';
 import addresses from '@/contracts/addresses.json';
 import { wagmiConfig } from '@/lib/wagmiConfig';
 import { sepolia } from 'wagmi/chains';
+
 type ChainId = (typeof sepolia)['id'];
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
@@ -22,35 +21,67 @@ const ZERO: `0x${string}` = '0x0000000000000000000000000000000000000000';
 export type PayInvoiceInput = {
   invoiceId: string;
   chainId: ChainId;
-  tokenAddress: `0x${string}`; // ZERO면 네이티브
-  tokenSymbol: string; // UI용
-  amount: string; // "0.01" 이런 문자열
-  orderId: number; // 서버/클라 어디서든 생성
-  decimals?: number; // ERC20은 보통 컨피그/메타데이터로 주입
+  tokenAddress: `0x${string}`;
+  tokenSymbol: string;
+  amount: string;
+  orderId: number;
+  decimals?: number;
 };
 
+function getGatewayAddress(chainId: number): `0x${string}` {
+  const a = addresses as any;
+
+  const gateway =
+    a.PaymentGateway ?? a[String(chainId)]?.PaymentGateway ?? a[chainId]?.PaymentGateway;
+
+  if (!gateway || typeof gateway !== 'string') {
+    throw new Error(`PaymentGateway address not found for chain ${chainId}`);
+  }
+
+  if (!/^0x[a-fA-F0-9]{40}$/.test(gateway)) {
+    throw new Error(`Invalid PaymentGateway address: ${gateway}`);
+  }
+
+  return gateway as `0x${string}`;
+}
+
+function getAbiFunctionNames() {
+  const abi = gatewayAbi as any[];
+
+  return abi
+    .filter((x) => x?.type === 'function')
+    .map((x) => x.name)
+    .filter(Boolean);
+}
+
 export async function payInvoice(inv: PayInvoiceInput) {
-  // 0) 체인/계정 준비
-  const wallet = await getWalletClient(wagmiConfig, { chainId: inv.chainId });
-  if (!wallet) throw new Error('Wallet not connected');
+  const functionNames = getAbiFunctionNames();
 
-  // 지갑 체인이 다르면 스위치 (유저 확인 팝업 뜸)
+  if (!functionNames.includes('pay')) {
+    throw new Error(
+      `Function "pay" not found on ABI. Available functions: ${functionNames.join(', ')}`,
+    );
+  }
+
+  // 0) 계정/체인 준비
   const account = getAccount(wagmiConfig);
-  if (!account?.address) throw new Error('No account selected');
 
-  // 일부 지갑은 현재 체인을 wallet 객체가 아닌 글로벌로 들고 있으므로 명시 스위치 권장
-  await switchChain(wagmiConfig, { chainId: inv.chainId }).catch(() => {
-    // 사용자가 거절할 수 있음
-    throw new Error('Please switch to the correct network');
-  });
+  if (!account?.address) {
+    throw new Error('Wallet not connected. Please connect your wallet on the login page first.');
+  }
 
-  //const publicClient = getPublicClient(wagmiConfig, { chainId: inv.chainId });
-  const gateway = addresses.PaymentGateway as `0x${string}`;
-  const isNative = inv.tokenAddress === ZERO;
-  const decimals = inv.decimals ?? 18; // 네이티브 기본 18
+  if (account.chainId !== inv.chainId) {
+    await switchChain(wagmiConfig, { chainId: inv.chainId }).catch(() => {
+      throw new Error('Please switch your wallet network to Sepolia.');
+    });
+  }
+
+  const gateway = getGatewayAddress(inv.chainId);
+  const isNative = inv.tokenAddress.toLowerCase() === ZERO.toLowerCase();
+  const decimals = inv.decimals ?? 18;
   const amount = parseUnits(inv.amount, decimals);
 
-  // 1) (ERC20) allowance 확인 → 부족하면 approve
+  // 1) ERC20이면 allowance 확인 → 부족하면 approve
   if (!isNative) {
     const allowance = (await readContract(wagmiConfig, {
       address: inv.tokenAddress,
@@ -61,7 +92,6 @@ export async function payInvoice(inv: PayInvoiceInput) {
     })) as bigint;
 
     if (allowance < amount) {
-      // 가스/리버트 미리 확인 (시뮬레이션)
       await simulateContract(wagmiConfig, {
         address: inv.tokenAddress,
         abi: erc20Abi,
@@ -75,7 +105,7 @@ export async function payInvoice(inv: PayInvoiceInput) {
         address: inv.tokenAddress,
         abi: erc20Abi,
         functionName: 'approve',
-        args: [gateway, amount], // 필요시 최대치(BigInt 최대값)로도 가능
+        args: [gateway, amount],
         chainId: inv.chainId,
       });
 
@@ -90,7 +120,7 @@ export async function payInvoice(inv: PayInvoiceInput) {
     }
   }
 
-  // 2) pay() 사전 시뮬레이션 → 실패 사유를 UX에서 곧장 표출
+  // 2) pay() 사전 시뮬레이션
   await simulateContract(wagmiConfig, {
     address: gateway,
     abi: gatewayAbi as any,
@@ -111,18 +141,22 @@ export async function payInvoice(inv: PayInvoiceInput) {
     ...(isNative ? { value: amount } : {}),
   });
 
-  // 4) (보수적) 컨펌 대기 후 백엔드에 제출
-  const rcpt = await waitForTransactionReceipt(wagmiConfig, { hash: payTx, chainId: inv.chainId });
+  // 4) 컨펌 대기
+  const rcpt = await waitForTransactionReceipt(wagmiConfig, {
+    hash: payTx,
+    chainId: inv.chainId,
+  });
+
   if (rcpt.status !== 'success') {
-    // EIP-1559 가진 지갑/네트워크에서 가스부족/리버트 등 케이스
     throw new Error('Payment transaction reverted');
   }
 
-  // 5) 백엔드 confirm (타임아웃/리트라이 방어)
+  // 5) 백엔드 confirm
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), 15_000);
 
   let backend: any;
+
   try {
     const res = await fetch(`${API}/api/payments/${inv.invoiceId}/confirm`, {
       method: 'PATCH',
@@ -130,8 +164,12 @@ export async function payInvoice(inv: PayInvoiceInput) {
       body: JSON.stringify({ txHash: payTx }),
       signal: controller.signal,
     });
+
     backend = await res.json().catch(() => ({}));
-    if (!res.ok) throw new Error(backend?.message || 'confirm failed');
+
+    if (!res.ok) {
+      throw new Error(backend?.message || 'confirm failed');
+    }
   } finally {
     clearTimeout(timer);
   }

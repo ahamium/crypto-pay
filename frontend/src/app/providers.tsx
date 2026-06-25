@@ -1,44 +1,15 @@
 'use client';
 
-import { WagmiConfig, createConfig, http } from 'wagmi';
-import { sepolia } from 'wagmi/chains';
+import { WagmiProvider } from 'wagmi';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { injected } from '@wagmi/connectors';
-import { walletConnect } from '@wagmi/connectors';
+import { wagmiConfig } from '@/lib/wagmiConfig';
 
 const queryClient = new QueryClient();
 
-const projectId = process.env.NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID;
-const connectors = [
-  injected({
-    target: 'metaMask',
-  }),
-  ...(projectId
-    ? [
-        walletConnect({
-          projectId,
-          metadata: {
-            name: 'Crypto Pay Gateway',
-            description: 'Crypto payment gateway demo',
-            url: 'https://app-crypto-pay-fe.azurewebsites.net',
-            icons: ['https://app-crypto-pay-fe.azurewebsites.net/favicon.ico'],
-          },
-          showQrModal: true,
-        }),
-      ]
-    : []),
-];
-
-const config = createConfig({
-  chains: [sepolia],
-  transports: { [sepolia.id]: http() }, // default RPC (브라우저에서 읽기만)
-  connectors,
-});
-
 export default function Providers({ children }: { children: React.ReactNode }) {
   return (
-    <WagmiConfig config={config}>
+    <WagmiProvider config={wagmiConfig}>
       <QueryClientProvider client={queryClient}>{children}</QueryClientProvider>
-    </WagmiConfig>
+    </WagmiProvider>
   );
 }
