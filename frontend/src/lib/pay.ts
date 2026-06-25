@@ -1,6 +1,6 @@
 import {
   getAccount,
-  getPublicClient,
+  //getPublicClient,
   getWalletClient,
   switchChain,
   writeContract,
@@ -44,7 +44,7 @@ export async function payInvoice(inv: PayInvoiceInput) {
     throw new Error('Please switch to the correct network');
   });
 
-  const publicClient = getPublicClient(wagmiConfig, { chainId: inv.chainId });
+  //const publicClient = getPublicClient(wagmiConfig, { chainId: inv.chainId });
   const gateway = addresses.PaymentGateway as `0x${string}`;
   const isNative = inv.tokenAddress === ZERO;
   const decimals = inv.decimals ?? 18; // 네이티브 기본 18
