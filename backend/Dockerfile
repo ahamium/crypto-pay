@@ -3,7 +3,7 @@ FROM node:20-alpine AS deps
 WORKDIR /app
 ENV NODE_ENV=development
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 RUN pnpm config set node-linker hoisted
 
 # pnpm-lock과 package.json만 먼저 복사해서 캐시 활용
@@ -15,7 +15,7 @@ FROM node:20-alpine AS build
 WORKDIR /app
 ENV NODE_ENV=development
 
-RUN corepack enable && corepack prepare pnpm@latest --activate
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
 RUN pnpm config set node-linker hoisted
 
 # 전체 소스 복사
