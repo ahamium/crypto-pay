@@ -11,7 +11,8 @@ COPY package.json pnpm-lock.yaml* ./
 RUN pnpm install
 
 # 2) 실제 빌드 단계
-FROM node:20-alpine AS build
+# deps stage를 그대로 이어받아서 pnpm을 다시 설치하지 않음
+FROM deps AS build
 WORKDIR /app
 
 ENV NODE_ENV=production
@@ -25,10 +26,6 @@ ENV NEXT_PUBLIC_API_BASE_URL=$NEXT_PUBLIC_API_BASE_URL
 ENV NEXT_PUBLIC_NETWORK=$NEXT_PUBLIC_NETWORK
 ENV NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 
-RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
-RUN pnpm config set node-linker hoisted
-
-COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 RUN pnpm build
@@ -40,7 +37,7 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 
-# 런타임에도 값은 남겨둠. 단, NEXT_PUBLIC 값은 이미 build 단계에서 주입됨.
+# 런타임에도 남겨둠. 단 NEXT_PUBLIC 값은 이미 build 단계에서 반영됨.
 ARG NEXT_PUBLIC_API_BASE_URL
 ARG NEXT_PUBLIC_NETWORK
 ARG NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
@@ -52,8 +49,9 @@ ENV NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID=$NEXT_PUBLIC_WALLETCONNECT_PROJECT_ID
 RUN addgroup -S app && adduser -S app -G app
 
 COPY --from=build /app/.next ./.next
-COPY --from=deps /app/node_modules ./node_modules
-COPY package.json ./
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/package.json ./package.json
+COPY --from=build /app/public ./public
 
 RUN chown -R app:app /app
 USER app
