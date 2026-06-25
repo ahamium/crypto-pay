@@ -9,7 +9,11 @@ async function main() {
         tokenAddress: '0x0000000000000000000000000000000000000000',
       },
     },
-    update: {},
+    update: {
+      tokenSymbol: 'ETH',
+      decimals: 18,
+      enabled: true,
+    },
     create: {
       chainId: 11155111,
       tokenAddress: '0x0000000000000000000000000000000000000000',
@@ -18,6 +22,7 @@ async function main() {
       enabled: true,
     },
   });
+  console.log('Seeded Sepolia native ETH whitelist');
 }
 
 main()

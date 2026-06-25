@@ -15,5 +15,8 @@ rm /home/data/.write-test
 echo "Running Prisma migration or db push..."
 ./node_modules/.bin/prisma migrate deploy || ./node_modules/.bin/prisma db push
 
+echo "Seeding TokenWhitelist..."
+node dist/prisma/seed.js
+
 echo "Starting NestJS app..."
 node dist/src/main.js
