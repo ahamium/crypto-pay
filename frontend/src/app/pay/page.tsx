@@ -125,6 +125,17 @@ export default function PayPage() {
 
       setTxHash(r.txHash);
       setBackendResult(r.backend);
+
+      if (r.backend?.status) {
+        setInvoice((prev) =>
+          prev
+            ? {
+                ...prev,
+                status: r.backend.status,
+              }
+            : prev,
+        );
+      }
     } catch (e: any) {
       setPayError(e?.message ?? 'Payment failed');
     } finally {
@@ -136,6 +147,9 @@ export default function PayPage() {
     if (id !== sepolia.id) throw new Error(`Unsupported chain: ${id}`);
     return id as typeof sepolia.id;
   };
+
+  const isPaid = invoice?.status === 'paid' || backendResult?.status === 'paid';
+  const hasSubmittedTx = Boolean(txHash);
 
   return (
     <main style={{ padding: 24, maxWidth: 760 }}>
@@ -258,8 +272,14 @@ export default function PayPage() {
           <h2>Invoice Created</h2>
           <pre style={{ overflowX: 'auto' }}>{JSON.stringify(invoice, null, 2)}</pre>
 
-          <button onClick={handlePay} disabled={paying}>
-            {paying ? 'Paying…' : 'Pay on-chain with MetaMask'}
+          <button onClick={handlePay} disabled={paying || isPaid || hasSubmittedTx}>
+            {paying
+              ? 'Paying…'
+              : isPaid
+                ? 'Payment completed'
+                : hasSubmittedTx
+                  ? 'Transaction submitted'
+                  : 'Pay on-chain with MetaMask'}
           </button>
 
           {txHash && (
@@ -272,6 +292,12 @@ export default function PayPage() {
               >
                 {txHash}
               </a>
+            </p>
+          )}
+
+          {isPaid && (
+            <p style={{ color: 'green', marginTop: 12 }}>
+              Payment completed successfully. You can view it in the admin dashboard.
             </p>
           )}
 
