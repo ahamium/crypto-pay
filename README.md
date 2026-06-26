@@ -1,9 +1,9 @@
 # Crypto Pay — On-Chain Payment Gateway MVP
 
-![CI](https://github.com/ahamium/crypto-pay/actions/workflows/ci.yml/badge.svg)
+[![CI](https://github.com/ahamium/crypto-pay/actions/workflows/ci.yml/badge.svg)](https://github.com/ahamium/crypto-pay/actions/workflows/ci.yml)
 [![CD](https://github.com/ahamium/crypto-pay/actions/workflows/cd.yml/badge.svg)](https://github.com/ahamium/crypto-pay/actions/workflows/cd.yml)
 
-A full-stack crypto payment gateway MVP that lets users sign in with Ethereum, create payment invoices, pay on-chain on Sepolia, and monitor transactions from an admin dashboard.
+A full-stack crypto payment gateway MVP that lets users sign in with Ethereum, create payment invoices, pay on-chain on Sepolia, and inspect payment activity through a public read-only admin dashboard.
 
 The project is built as a production-style monorepo with Next.js, NestJS, Prisma, Hardhat, Docker, GitHub Actions, GHCR, and Azure App Service container deployment.
 
@@ -12,7 +12,9 @@ The project is built as a production-style monorepo with Next.js, NestJS, Prisma
 - Frontend: `https://app-crypto-pay-fe.azurewebsites.net`
 - Backend Health Check: `https://app-crypto-pay-be.azurewebsites.net/health`
 - Network: Sepolia Testnet
-- Payment Contract: `<SEPOLIA_PAYMENT_GATEWAY_ADDRESS>`
+- Payment Contract: [`0x1cc75CC740C60F4dD0f618D16838087352faD2b8`](https://sepolia.etherscan.io/address/0x1cc75CC740C60F4dD0f618D16838087352faD2b8)
+
+The deployed admin dashboard is publicly viewable in read-only demo mode so reviewers can inspect payment records, statuses, and transaction hashes without needing an admin wallet. Operational actions such as CSV export and future write operations require admin-wallet authentication.
 
 ## Demo Flow
 
@@ -24,7 +26,8 @@ The project is built as a production-style monorepo with Next.js, NestJS, Prisma
 6. Create an invoice
 7. Confirm the Sepolia transaction in MetaMask
 8. Open `/admin`
-9. Verify the payment status and transaction hash
+9. Inspect payment status, transaction hash, payer address, and confirmations in the read-only dashboard
+10. Sign in with the admin wallet to access protected actions such as CSV export
 
 ## Features
 
@@ -48,10 +51,12 @@ The project is built as a production-style monorepo with Next.js, NestJS, Prisma
 
 ### Admin Dashboard
 
-- Protected admin payment dashboard
+- Public read-only admin dashboard for portfolio/demo reviewers
 - Filter and sort payment records
 - View invoice ID, status, chain ID, token, amount, payer, receiver, transaction hash, and confirmations
-- CSV export support
+- Transaction hash links to Sepolia Etherscan
+- Protected CSV export for admin-wallet users
+- Designed so visitors can inspect the demo safely while operational actions remain restricted
 - Responsive mobile-friendly login and admin UX
 
 ### DevOps / Deployment
@@ -418,7 +423,9 @@ GET /admin/payments
 GET /admin/payments/export.csv
 ```
 
-Protected admin APIs for payment monitoring and export.
+GET /admin/payments is publicly available as a read-only demo endpoint for portfolio reviewers. It allows visitors to inspect payment records, statuses, and transaction hashes.
+
+GET /admin/payments/export.csv is protected and requires admin-wallet authentication.
 
 ## Limitations
 
@@ -429,6 +436,7 @@ Current limitations:
 - Uses Sepolia testnet
 - Uses SQLite for demo persistence
 - Uses App Service storage for deployed SQLite demo DB
+- The deployed admin dashboard exposes a public read-only demo view. Production deployments should restrict sensitive data and operational actions with stronger RBAC, audit logging, and managed database access.
 - Native Sepolia ETH is seeded by default
 - ERC-20 flow is contract/API compatible but requires token whitelist configuration
 - Production deployments should use PostgreSQL or another managed database

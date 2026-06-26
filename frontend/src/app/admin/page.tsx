@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
-import { fetchPayments, exportCsvUrl } from '@/lib/admin';
+import { fetchPayments, downloadPaymentsCsv } from '@/lib/admin';
 
 type Status = 'pending' | 'submitted' | 'paid' | 'failed' | 'expired' | '';
 
@@ -19,6 +19,8 @@ export default function AdminPage() {
 
   const [data, setData] = useState<{ items: any[]; total: number } | null>(null);
   const [loading, setLoading] = useState(false);
+  const [csvLoading, setCsvLoading] = useState(false);
+  const [jwt, setJwt] = useState<string | null>(null);
   const [authError, setAuthError] = useState(false);
   const params = useMemo(
     () => ({ status, chainId, from, to, q, sortBy, sortDir, page, pageSize }),
@@ -27,19 +29,26 @@ export default function AdminPage() {
 
   async function load() {
     setLoading(true);
+
     try {
       const d = await fetchPayments(params);
-      setAuthError(false);
       setData({ items: d.items, total: d.total });
     } catch (e: any) {
-      if (e.message === 'LOGIN_REQUIRED' || e.message === 'UNAUTHORIZED') {
-        setAuthError(true);
-        return;
-      }
-
-      alert(e.message);
+      alert(e.message || 'Failed to load payments');
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function handleCsvExport() {
+    setCsvLoading(true);
+
+    try {
+      await downloadPaymentsCsv(params);
+    } catch (e: any) {
+      alert(e.message || 'CSV export failed');
+    } finally {
+      setCsvLoading(false);
     }
   }
 
@@ -47,57 +56,69 @@ export default function AdminPage() {
     load();
   }, [params]); // 필터 바뀌면 자동 로드
 
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setJwt(localStorage.getItem('jwt'));
+    }
+  }, []);
+
   const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
-
-  if (authError) {
-    return (
-      <main style={{ padding: 24, maxWidth: 760 }}>
-        <h1>Admin · Payments</h1>
-
-        <section
-          style={{
-            marginTop: 12,
-            marginBottom: 16,
-            padding: 16,
-            border: '1px solid #ffd591',
-            background: '#fff7e6',
-            borderRadius: 8,
-            maxWidth: 560,
-          }}
-        >
-          <h2 style={{ marginTop: 0 }}>Admin login required</h2>
-          <p style={{ lineHeight: 1.6 }}>
-            This dashboard is protected. Please sign in with the admin wallet first.
-          </p>
-
-          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Link
-              href="/login"
-              style={{
-                display: 'inline-block',
-                padding: '10px 14px',
-                border: '1px solid #ccc',
-                borderRadius: 6,
-                textDecoration: 'none',
-                color: 'black',
-                background: 'white',
-              }}
-            >
-              Go to Login
-            </Link>
-
-            <button onClick={() => load()} disabled={loading}>
-              {loading ? 'Checking…' : 'Retry'}
-            </button>
-          </div>
-        </section>
-      </main>
-    );
-  }
 
   return (
     <main style={{ padding: 24 }}>
       <h1>Admin · Payments</h1>
+      <section
+        style={{
+          marginTop: 12,
+          marginBottom: 16,
+          padding: 16,
+          border: '1px solid #ffd591',
+          background: '#fff7e6',
+          borderRadius: 8,
+          maxWidth: 760,
+          lineHeight: 1.6,
+        }}
+      >
+        <h2 style={{ marginTop: 0 }}>Read-only Demo Mode</h2>
+
+        <p>
+          This dashboard is publicly viewable for portfolio/demo purposes. Visitors can inspect
+          payment records, statuses, and transaction hashes, but operational actions are restricted
+          to the admin wallet.
+        </p>
+
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+          <Link
+            href="/login"
+            style={{
+              display: 'inline-block',
+              padding: '10px 14px',
+              border: '1px solid #ccc',
+              borderRadius: 6,
+              textDecoration: 'none',
+              color: 'black',
+              background: 'white',
+            }}
+          >
+            Admin Login
+          </Link>
+
+          <Link
+            href="/pay"
+            style={{
+              display: 'inline-block',
+              padding: '10px 14px',
+              border: '1px solid #ccc',
+              borderRadius: 6,
+              textDecoration: 'none',
+              color: 'black',
+              background: 'white',
+            }}
+          >
+            Create Demo Payment
+          </Link>
+        </div>
+      </section>
       <section
         style={{
           display: 'grid',
@@ -187,9 +208,14 @@ export default function AdminPage() {
             ))}
           </select>
         </label>
-        <a href={exportCsvUrl(params)} target="_blank" rel="noreferrer">
-          <button>Export CSV</button>
-        </a>
+        <button onClick={handleCsvExport} disabled={csvLoading}>
+          {csvLoading ? 'Exporting…' : 'Export CSV'}
+        </button>
+        {!jwt && (
+          <span style={{ color: '#666', fontSize: 13 }}>
+            CSV export requires admin wallet login.
+          </span>
+        )}
       </div>
 
       <section style={{ marginTop: 16, overflowX: 'auto', width: '100%' }}>
