@@ -2,12 +2,51 @@
 
 import { useAccount, useConnect, useDisconnect, useSignMessage, useSwitchChain } from 'wagmi';
 import { SiweMessage } from 'siwe';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import Link from 'next/link';
 import { sepolia } from 'wagmi/chains';
 
 const API = process.env.NEXT_PUBLIC_API_BASE_URL || 'http://localhost:5000';
 const EXPECTED_CHAIN_ID = sepolia.id; // 11155111
+
+const cardStyle: CSSProperties = {
+  display: 'grid',
+  gap: 16,
+  width: '100%',
+  maxWidth: 560,
+  minWidth: 0,
+  border: '1px solid #ddd',
+  borderRadius: 12,
+  padding: 20,
+  boxSizing: 'border-box',
+  overflow: 'hidden',
+};
+
+const fullButtonStyle: CSSProperties = {
+  width: '100%',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 14px',
+};
+
+const fullLinkButtonStyle: CSSProperties = {
+  display: 'block',
+  width: '100%',
+  maxWidth: '100%',
+  boxSizing: 'border-box',
+  padding: '10px 14px',
+  border: '1px solid #ccc',
+  borderRadius: 6,
+  textAlign: 'center',
+  textDecoration: 'none',
+  color: 'black',
+  background: 'white',
+};
+
+const breakTextStyle: CSSProperties = {
+  overflowWrap: 'anywhere',
+  wordBreak: 'break-word',
+};
 
 function shortAddress(address?: string) {
   if (!address) return '';
@@ -53,38 +92,33 @@ function isInjectedConnector(connector: { id?: string; name?: string }) {
   return id.includes('injected') || name.includes('injected');
 }
 
-async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 15000) {
+async function fetchWithTimeout(url: string, options: RequestInit = {}, timeoutMs = 45000) {
   const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let timedOut = false;
+
+  const timer = setTimeout(() => {
+    timedOut = true;
+    controller.abort();
+  }, timeoutMs);
 
   try {
     return await fetch(url, {
       ...options,
       signal: controller.signal,
     });
+  } catch (err) {
+    if (timedOut) {
+      throw new Error('Request timed out. The backend may be waking up. Please try again.');
+    }
+
+    if (err instanceof Error && err.name === 'AbortError') {
+      throw new Error('Request was cancelled. Please try again.');
+    }
+
+    throw err;
   } finally {
     clearTimeout(timer);
   }
-}
-
-function promiseWithTimeout<T>(
-  promise: Promise<T>,
-  timeoutMs: number,
-  message: string,
-): Promise<T> {
-  return new Promise((resolve, reject) => {
-    const timer = setTimeout(() => reject(new Error(message)), timeoutMs);
-
-    promise
-      .then((value) => {
-        clearTimeout(timer);
-        resolve(value);
-      })
-      .catch((err) => {
-        clearTimeout(timer);
-        reject(err);
-      });
-  });
 }
 
 export default function SiweSignIn() {
@@ -101,9 +135,25 @@ export default function SiweSignIn() {
   );
   const [loading, setLoading] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
+  const [readyToSign, setReadyToSign] = useState(false);
 
   const walletInstalled = useMemo(() => hasInjectedWallet(), []);
   const mobile = useMemo(() => isMobile(), []);
+
+  useEffect(() => {
+    if (!isConnected || !address) {
+      setReadyToSign(false);
+      return;
+    }
+
+    setReadyToSign(false);
+
+    const timer = setTimeout(() => {
+      setReadyToSign(true);
+    }, 3000);
+
+    return () => clearTimeout(timer);
+  }, [isConnected, address, chainId]);
 
   const visibleConnectors = useMemo(() => {
     return connectors.filter((connector) => {
@@ -154,6 +204,11 @@ export default function SiweSignIn() {
       return;
     }
 
+    if (!readyToSign) {
+      setMessage('Wallet connected. Please wait a moment, then sign in.');
+      return;
+    }
+
     if (chainId !== EXPECTED_CHAIN_ID) {
       setMessage('Please switch your wallet network to Sepolia first.');
       return;
@@ -167,7 +222,7 @@ export default function SiweSignIn() {
     setMessage('Preparing sign-in request...');
 
     try {
-      const nonceRes = await fetchWithTimeout(`${API}/auth/nonce?address=${address}`, {}, 15000);
+      const nonceRes = await fetchWithTimeout(`${API}/auth/nonce?address=${address}`, {}, 45000);
 
       if (!isCurrentRun()) return;
 
@@ -191,11 +246,7 @@ export default function SiweSignIn() {
 
       setMessage('Waiting for wallet signature. Check MetaMask or WalletConnect.');
 
-      const signature = await promiseWithTimeout(
-        signMessageAsync({ message: preparedMessage }),
-        30000,
-        'Signature request timed out. Please check your wallet app/popup and try again.',
-      );
+      const signature = await signMessageAsync({ message: preparedMessage });
 
       if (!isCurrentRun()) return;
 
@@ -212,7 +263,7 @@ export default function SiweSignIn() {
             domain: window.location.host,
           }),
         },
-        15000,
+        45000,
       );
 
       if (!isCurrentRun()) return;
@@ -232,7 +283,21 @@ export default function SiweSignIn() {
     } catch (err) {
       if (!isCurrentRun()) return;
 
-      const msg = err instanceof Error ? err.message : 'Login failed';
+      let msg = err instanceof Error ? err.message : 'Login failed';
+
+      if (msg.includes('signal is aborted') || msg.includes('aborted without reason')) {
+        msg = 'Request was cancelled or timed out. Please try again.';
+      }
+
+      if (msg.includes('User rejected') || msg.includes('user rejected')) {
+        msg = 'The request was rejected in the wallet.';
+      }
+
+      if (msg.includes('wallet_requestPermissions') && msg.includes('already pending')) {
+        msg =
+          'A MetaMask connection request is already pending. Open MetaMask and approve or cancel it, then try again.';
+      }
+
       setMessage(msg);
     } finally {
       if (isCurrentRun()) {
@@ -251,16 +316,7 @@ export default function SiweSignIn() {
   }
 
   return (
-    <div
-      style={{
-        display: 'grid',
-        gap: 16,
-        maxWidth: 560,
-        border: '1px solid #ddd',
-        borderRadius: 12,
-        padding: 20,
-      }}
-    >
+    <div style={cardStyle}>
       <div>
         <h2 style={{ marginTop: 0 }}>Wallet Login</h2>
         <p style={{ lineHeight: 1.6, color: '#444' }}>
@@ -296,7 +352,7 @@ export default function SiweSignIn() {
                 }}
                 disabled={isConnecting}
                 style={{
-                  padding: '10px 14px',
+                  ...fullButtonStyle,
                   cursor: isConnecting ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -324,19 +380,7 @@ export default function SiweSignIn() {
                 MetaMask.
               </span>
 
-              <a
-                href={getMetaMaskMobileDeepLink()}
-                style={{
-                  display: 'inline-block',
-                  padding: '10px 14px',
-                  border: '1px solid #ccc',
-                  borderRadius: 6,
-                  textAlign: 'center',
-                  color: 'black',
-                  textDecoration: 'none',
-                  background: 'white',
-                }}
-              >
+              <a href={getMetaMaskMobileDeepLink()} style={fullLinkButtonStyle}>
                 Open in MetaMask Mobile
               </a>
 
@@ -360,6 +404,12 @@ export default function SiweSignIn() {
             </div>
           </div>
 
+          {isConnected && !jwt && !isWrongNetwork && (
+            <p style={{ margin: 0, color: '#555' }}>
+              Wallet connected. Now click “Sign-In with Ethereum” to complete login.
+            </p>
+          )}
+
           {isWrongNetwork && (
             <div
               style={{
@@ -376,7 +426,7 @@ export default function SiweSignIn() {
                 This demo only supports Sepolia testnet. Chain ID must be 11155111.
               </p>
 
-              <button onClick={switchToSepolia} disabled={isSwitching}>
+              <button onClick={switchToSepolia} disabled={isSwitching} style={fullButtonStyle}>
                 {isSwitching ? 'Switching...' : 'Switch to Sepolia'}
               </button>
 
@@ -392,17 +442,29 @@ export default function SiweSignIn() {
             </div>
           )}
 
-          <button onClick={handleLogin} disabled={loading || isWrongNetwork}>
-            {loading ? 'Signing in...' : jwt ? 'Sign-In Again' : 'Sign-In with Ethereum'}
+          <button
+            onClick={handleLogin}
+            disabled={loading || isWrongNetwork || !readyToSign}
+            style={fullButtonStyle}
+          >
+            {loading
+              ? 'Signing in...'
+              : !readyToSign
+                ? 'Preparing wallet...'
+                : jwt
+                  ? 'Sign-In Again'
+                  : 'Sign-In with Ethereum'}
           </button>
 
           {loading && (
-            <button type="button" onClick={resetLoginState}>
+            <button type="button" onClick={resetLoginState} style={fullButtonStyle}>
               Cancel / Reset Login
             </button>
           )}
 
-          <button onClick={handleDisconnect}>Disconnect</button>
+          <button onClick={handleDisconnect} style={fullButtonStyle}>
+            Disconnect
+          </button>
 
           {jwt && !isWrongNetwork && (
             <div
@@ -418,35 +480,11 @@ export default function SiweSignIn() {
             >
               <strong>Login complete. Choose your next step:</strong>
 
-              <Link
-                href="/pay"
-                style={{
-                  display: 'block',
-                  padding: '10px 14px',
-                  border: '1px solid #ccc',
-                  borderRadius: 6,
-                  textAlign: 'center',
-                  textDecoration: 'none',
-                  color: 'black',
-                  background: 'white',
-                }}
-              >
+              <Link href="/pay" style={fullLinkButtonStyle}>
                 Go to Payment Page
               </Link>
 
-              <Link
-                href="/admin"
-                style={{
-                  display: 'block',
-                  padding: '10px 14px',
-                  border: '1px solid #ccc',
-                  borderRadius: 6,
-                  textAlign: 'center',
-                  textDecoration: 'none',
-                  color: 'black',
-                  background: 'white',
-                }}
-              >
+              <Link href="/admin" style={fullLinkButtonStyle}>
                 Go to Admin Dashboard
               </Link>
             </div>
@@ -466,13 +504,14 @@ export default function SiweSignIn() {
                 ? 'crimson'
                 : '#333',
             whiteSpace: 'pre-wrap',
+            ...breakTextStyle,
           }}
         >
           {message}
         </p>
       )}
 
-      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5 }}>
+      <div style={{ fontSize: 13, color: '#666', lineHeight: 1.5, ...breakTextStyle }}>
         API: <code>{API}</code>
       </div>
     </div>
