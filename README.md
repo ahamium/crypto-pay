@@ -1,6 +1,7 @@
 # Crypto Pay — On-Chain Payment Gateway MVP
 
 ![CI](https://github.com/ahamium/crypto-pay/actions/workflows/ci.yml/badge.svg)
+[![CD](https://github.com/ahamium/crypto-pay/actions/workflows/cd.yml/badge.svg)](https://github.com/ahamium/crypto-pay/actions/workflows/cd.yml)
 
 A full-stack crypto payment gateway MVP that lets users sign in with Ethereum, create payment invoices, pay on-chain on Sepolia, and monitor transactions from an admin dashboard.
 
@@ -444,7 +445,3 @@ Current limitations:
 - Dockerized deployment
 - CI/CD with GitHub Actions and Azure
 - Practical dApp UX handling for desktop and mobile wallets
-
-```
-
-```
