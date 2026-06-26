@@ -49,11 +49,11 @@ export default function AdminPage() {
 
   const totalPages = data ? Math.max(1, Math.ceil(data.total / pageSize)) : 1;
 
-  return (
-    <main style={{ padding: 24 }}>
-      <h1>Admin · Payments</h1>
+  if (authError) {
+    return (
+      <main style={{ padding: 24, maxWidth: 760 }}>
+        <h1>Admin · Payments</h1>
 
-      {authError && (
         <section
           style={{
             marginTop: 12,
@@ -70,29 +70,41 @@ export default function AdminPage() {
             This dashboard is protected. Please sign in with the admin wallet first.
           </p>
 
-          <Link
-            href="/login"
-            style={{
-              display: 'inline-block',
-              padding: '10px 14px',
-              border: '1px solid #ccc',
-              borderRadius: 6,
-              textDecoration: 'none',
-              color: 'black',
-              background: 'white',
-            }}
-          >
-            Go to Login
-          </Link>
-        </section>
-      )}
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <Link
+              href="/login"
+              style={{
+                display: 'inline-block',
+                padding: '10px 14px',
+                border: '1px solid #ccc',
+                borderRadius: 6,
+                textDecoration: 'none',
+                color: 'black',
+                background: 'white',
+              }}
+            >
+              Go to Login
+            </Link>
 
+            <button onClick={() => load()} disabled={loading}>
+              {loading ? 'Checking…' : 'Retry'}
+            </button>
+          </div>
+        </section>
+      </main>
+    );
+  }
+
+  return (
+    <main style={{ padding: 24 }}>
+      <h1>Admin · Payments</h1>
       <section
         style={{
           display: 'grid',
-          gridTemplateColumns: 'repeat(6, minmax(0, 1fr))',
+          gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
           gap: 12,
           marginTop: 12,
+          maxWidth: 1200,
         }}
       >
         <select
@@ -180,8 +192,8 @@ export default function AdminPage() {
         </a>
       </div>
 
-      <section style={{ marginTop: 16 }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+      <section style={{ marginTop: 16, overflowX: 'auto', width: '100%' }}>
+        <table style={{ width: '100%', minWidth: 1000, borderCollapse: 'collapse' }}>
           <thead>
             <tr>
               {[
